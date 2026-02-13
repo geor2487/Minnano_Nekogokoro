@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import type { Cat, TranslateResult } from "../types";
 import api from "../lib/api";
-import { uploadImage } from "../utils/imageUpload";
-import { CameraIcon, TranslateIcon, VideoIcon, PawPrint } from "./Icons";
+import { uploadImage, uploadVideo, fileToBase64 } from "../utils/imageUpload";
+import { CameraIcon, TranslateIcon, VideoIcon, XIcon } from "./Icons";
 import MoodBadge from "./MoodBadge";
 import SpeechBubble from "./SpeechBubble";
 import Avatar from "./Avatar";
@@ -20,6 +20,8 @@ interface ComposeModalProps {
   onPost: (data: {
     content: string;
     catId: string;
+    imageUrl?: string;
+    videoUrl?: string;
     translation?: string;
     mood?: string;
     moodFace?: string;
@@ -34,12 +36,51 @@ export default function ComposeModal({ cats, onClose, onPost, onRegisterCat }: C
   const [translating, setTranslating] = useState(false);
   const [posting, setPosting] = useState(false);
   const [error, setError] = useState("");
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [videoPreview, setVideoPreview] = useState<string | null>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (cats.length > 0 && !selectedCatId) {
       setSelectedCatId(cats[0].id);
     }
   }, [cats, selectedCatId]);
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setImageFile(file);
+      setImagePreview(URL.createObjectURL(file));
+      setVideoFile(null);
+      setVideoPreview(null);
+    }
+    if (e.target) e.target.value = "";
+  };
+
+  const handleVideoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 50 * 1024 * 1024) {
+        setError("動画は50MB以下にしてください");
+        return;
+      }
+      setVideoFile(file);
+      setVideoPreview(URL.createObjectURL(file));
+      setImageFile(null);
+      setImagePreview(null);
+    }
+    if (e.target) e.target.value = "";
+  };
+
+  const clearMedia = () => {
+    setImageFile(null);
+    setImagePreview(null);
+    setVideoFile(null);
+    setVideoPreview(null);
+  };
 
   const handleTranslate = async () => {
     if (!content.trim() || !selectedCatId) return;
@@ -60,9 +101,19 @@ export default function ComposeModal({ cats, onClose, onPost, onRegisterCat }: C
     setPosting(true);
     setError("");
     try {
+      let imageUrl: string | undefined;
+      let videoUrl: string | undefined;
+      if (imageFile) {
+        imageUrl = await uploadImage(imageFile);
+      }
+      if (videoFile) {
+        videoUrl = await uploadVideo(videoFile);
+      }
       await onPost({
         content,
         catId: selectedCatId,
+        imageUrl,
+        videoUrl,
         translation: translation?.translation,
         mood: translation?.mood,
         moodFace: translation?.moodFace,
@@ -180,6 +231,10 @@ export default function ComposeModal({ cats, onClose, onPost, onRegisterCat }: C
         </div>
       )}
 
+      {/* Hidden file inputs */}
+      <input type="file" accept="image/*" ref={imageInputRef} onChange={handleImageSelect} style={{ display: "none" }} />
+      <input type="file" accept="video/*" ref={videoInputRef} onChange={handleVideoSelect} style={{ display: "none" }} />
+
       {/* Text area */}
       <textarea
         value={content}
@@ -200,6 +255,40 @@ export default function ComposeModal({ cats, onClose, onPost, onRegisterCat }: C
           boxSizing: "border-box",
         }}
       />
+
+      {/* Media preview */}
+      {(imagePreview || videoPreview) && (
+        <div style={{ padding: "0 20px 12px", position: "relative" }}>
+          <div style={{ position: "relative", borderRadius: 12, overflow: "hidden", border: "1px solid #e7e5e4" }}>
+            {imagePreview && (
+              <img src={imagePreview} alt="preview" style={{ width: "100%", maxHeight: 240, objectFit: "cover", display: "block" }} />
+            )}
+            {videoPreview && (
+              <video src={videoPreview} controls style={{ width: "100%", maxHeight: 240, display: "block" }} />
+            )}
+            <button
+              onClick={clearMedia}
+              style={{
+                position: "absolute",
+                top: 8,
+                right: 8,
+                width: 28,
+                height: 28,
+                borderRadius: "50%",
+                border: "none",
+                background: "rgba(0,0,0,0.5)",
+                color: "#fff",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <XIcon size={14} />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Translation result */}
       {translation && selectedCat && (
@@ -228,13 +317,14 @@ export default function ComposeModal({ cats, onClose, onPost, onRegisterCat }: C
         }}
       >
         <button
+          onClick={() => imageInputRef.current?.click()}
           style={{
             display: "flex",
             alignItems: "center",
             gap: 6,
             padding: "8px 14px",
             borderRadius: 10,
-            border: "none",
+            border: imageFile ? "2px solid #f59e0b" : "none",
             background: "#fef3c7",
             color: "#f59e0b",
             fontSize: 13,
@@ -247,13 +337,14 @@ export default function ComposeModal({ cats, onClose, onPost, onRegisterCat }: C
           写真
         </button>
         <button
+          onClick={() => videoInputRef.current?.click()}
           style={{
             display: "flex",
             alignItems: "center",
             gap: 6,
             padding: "8px 14px",
             borderRadius: 10,
-            border: "none",
+            border: videoFile ? "2px solid #ec4899" : "none",
             background: "#fce7f3",
             color: "#ec4899",
             fontSize: 13,

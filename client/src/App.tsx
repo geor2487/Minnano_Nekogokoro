@@ -13,6 +13,7 @@ import ProfileTab from "./components/ProfileTab";
 import ComposeModal from "./components/ComposeModal";
 import CommentModal from "./components/CommentModal";
 import OnboardingGuide from "./components/OnboardingGuide";
+import Consult from "./pages/Consult";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import api from "./lib/api";
@@ -85,6 +86,8 @@ function AppContent() {
     async (data: {
       content: string;
       catId: string;
+      imageUrl?: string;
+      videoUrl?: string;
       translation?: string;
       mood?: string;
       moodFace?: string;
@@ -103,8 +106,8 @@ function AppContent() {
 
   const handleTabChange = useCallback(
     (newTab: string) => {
-      if (newTab === "profile") {
-        requireAuth(() => setTab("profile"));
+      if (newTab === "profile" || newTab === "consult") {
+        requireAuth(() => setTab(newTab));
       } else {
         setTab(newTab);
       }
@@ -200,6 +203,7 @@ function AppContent() {
       >
         {tab === "home" && <HomeTab onComment={handleOpenComment} requireAuth={requireAuth} currentUserId={user?.id} />}
         {tab === "search" && <SearchTab onComment={handleOpenComment} requireAuth={requireAuth} currentUserId={user?.id} />}
+        {tab === "consult" && user && <Consult cats={cats} onPost={handlePost} onGoHome={() => setTab("home")} />}
         {tab === "profile" && user && (
           <ProfileTab
             user={user}
@@ -238,7 +242,6 @@ function AppContent() {
       <BottomNav
         currentTab={tab}
         onChangeTab={handleTabChange}
-        onCompose={handleCompose}
       />
 
       {/* Auth Modal */}

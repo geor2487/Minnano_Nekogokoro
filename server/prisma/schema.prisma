@@ -14,14 +14,16 @@ model User {
   googleId  String?  @unique
   bio       String?
   avatarUrl String?
+  coverUrl  String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  cats       Cat[]
-  posts      Post[]
-  comments   Comment[]
-  likes      Like[]
-  following  Follow[] @relation("follower")
+  cats          Cat[]
+  posts         Post[]
+  comments      Comment[]
+  likes         Like[]
+  following     Follow[] @relation("follower")
+  consultations Consultation[]
 }
 
 model Cat {
@@ -36,9 +38,10 @@ model Cat {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  posts     Post[]
-  followers Follow[]
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  posts         Post[]
+  followers     Follow[]
+  consultations Consultation[]
 
   @@index([userId])
 }
@@ -47,6 +50,7 @@ model Post {
   id            String   @id @default(uuid())
   content       String
   imageUrl      String?
+  videoUrl      String?
   translation   String?
   mood          String?
   moodFace      String?
@@ -103,4 +107,25 @@ model Follow {
   @@unique([followerId, catId])
   @@index([followerId])
   @@index([catId])
+}
+
+model Consultation {
+  id          String   @id @default(uuid())
+  userId      String
+  catId       String
+  inputType   String   // "text" | "photo" | "video"
+  inputText   String?
+  mediaUrl    String?
+  frameCount  Int?
+  feeling     String
+  explanation String
+  advice      String
+  mood        String
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cat  Cat  @relation(fields: [catId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, createdAt(sort: Desc)])
 }

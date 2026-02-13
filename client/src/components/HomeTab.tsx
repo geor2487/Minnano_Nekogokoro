@@ -11,7 +11,7 @@ interface HomeTabProps {
 }
 
 export default function HomeTab({ onComment, requireAuth, currentUserId }: HomeTabProps) {
-  const { posts, loading, fetchPosts, toggleLike, toggleFollowCat } = usePosts();
+  const { posts, loading, fetchPosts, toggleLike, toggleFollowCat, deletePost } = usePosts();
 
   const handleLike = (postId: string) => {
     if (requireAuth) {
@@ -69,6 +69,7 @@ export default function HomeTab({ onComment, requireAuth, currentUserId }: HomeT
             onLike={handleLike}
             onComment={onComment}
             onFollowCat={handleFollowCat}
+            onDelete={deletePost}
             currentUserId={currentUserId}
             style={{
               opacity: loaded ? 1 : 0,

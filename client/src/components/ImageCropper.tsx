@@ -5,6 +5,8 @@ interface ImageCropperProps {
   onCrop: (croppedFile: File) => void;
   onCancel: () => void;
   cropSize?: number;
+  shape?: "circle" | "rect";
+  aspectRatio?: number; // width / height, e.g. 3 for 3:1
 }
 
 export default function ImageCropper({
@@ -12,6 +14,8 @@ export default function ImageCropper({
   onCrop,
   onCancel,
   cropSize = 400,
+  shape = "circle",
+  aspectRatio = 1,
 }: ImageCropperProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -24,17 +28,20 @@ export default function ImageCropper({
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [naturalSize, setNaturalSize] = useState({ w: 0, h: 0 });
 
-  const viewSize = 280;
+  const viewWidth = shape === "rect" ? 300 : 280;
+  const viewHeight = shape === "rect" ? Math.round(300 / aspectRatio) : 280;
 
   // Compute actual pixel scale from zoom level (0-100)
-  // zoom=0 means image just fits the circle, zoom=100 means 3x that
+  // zoom=0 means image just covers the crop area, zoom=100 means 3x that
   const getScale = useCallback(
     (z: number) => {
       if (naturalSize.w === 0 || naturalSize.h === 0) return 1;
-      const fitScale = viewSize / Math.min(naturalSize.w, naturalSize.h);
+      const fitScaleW = viewWidth / naturalSize.w;
+      const fitScaleH = viewHeight / naturalSize.h;
+      const fitScale = Math.max(fitScaleW, fitScaleH);
       return fitScale * (1 + (z / 100) * 2);
     },
-    [naturalSize]
+    [naturalSize, viewWidth, viewHeight]
   );
 
   const scale = getScale(zoom);
@@ -44,10 +51,12 @@ export default function ImageCropper({
     img.onload = () => {
       imgRef.current = img;
       setNaturalSize({ w: img.naturalWidth, h: img.naturalHeight });
-      const fitScale = viewSize / Math.min(img.naturalWidth, img.naturalHeight);
+      const fitScaleW = viewWidth / img.naturalWidth;
+      const fitScaleH = viewHeight / img.naturalHeight;
+      const fitScale = Math.max(fitScaleW, fitScaleH);
       setOffset({
-        x: (viewSize - img.naturalWidth * fitScale) / 2,
-        y: (viewSize - img.naturalHeight * fitScale) / 2,
+        x: (viewWidth - img.naturalWidth * fitScale) / 2,
+        y: (viewHeight - img.naturalHeight * fitScale) / 2,
       });
       setZoom(0);
       setImgLoaded(true);
@@ -100,8 +109,8 @@ export default function ImageCropper({
       const newScale = getScale(clamped);
       if (oldScale === 0) return;
       const ratio = newScale / oldScale;
-      const cx = viewSize / 2;
-      const cy = viewSize / 2;
+      const cx = viewWidth / 2;
+      const cy = viewHeight / 2;
       setOffset((o) => ({
         x: cx - (cx - o.x) * ratio,
         y: cy - (cy - o.y) * ratio,
@@ -115,33 +124,38 @@ export default function ImageCropper({
     if (!imgRef.current || !canvasRef.current) return;
 
     const canvas = canvasRef.current;
-    canvas.width = cropSize;
-    canvas.height = cropSize;
+    const outW = shape === "rect" ? cropSize : cropSize;
+    const outH = shape === "rect" ? Math.round(cropSize / aspectRatio) : cropSize;
+    canvas.width = outW;
+    canvas.height = outH;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
     const sx = -offset.x / scale;
     const sy = -offset.y / scale;
-    const sw = viewSize / scale;
-    const sh = viewSize / scale;
+    const sw = viewWidth / scale;
+    const sh = viewHeight / scale;
 
-    ctx.beginPath();
-    ctx.arc(cropSize / 2, cropSize / 2, cropSize / 2, 0, Math.PI * 2);
-    ctx.closePath();
-    ctx.clip();
+    if (shape === "circle") {
+      ctx.beginPath();
+      ctx.arc(outW / 2, outH / 2, outW / 2, 0, Math.PI * 2);
+      ctx.closePath();
+      ctx.clip();
+    }
 
-    ctx.drawImage(imgRef.current, sx, sy, sw, sh, 0, 0, cropSize, cropSize);
+    ctx.drawImage(imgRef.current, sx, sy, sw, sh, 0, 0, outW, outH);
 
     canvas.toBlob(
       (blob) => {
         if (blob) {
-          onCrop(new File([blob], "avatar.jpg", { type: "image/jpeg" }));
+          const name = shape === "rect" ? "cover.jpg" : "avatar.jpg";
+          onCrop(new File([blob], name, { type: "image/jpeg" }));
         }
       },
       "image/jpeg",
       0.85
     );
-  }, [offset, scale, cropSize, onCrop]);
+  }, [offset, scale, cropSize, aspectRatio, shape, viewWidth, viewHeight, onCrop]);
 
   const displayW = naturalSize.w * scale;
   const displayH = naturalSize.h * scale;
@@ -186,8 +200,8 @@ export default function ImageCropper({
         {!imgLoaded ? (
           <div
             style={{
-              width: viewSize,
-              height: viewSize,
+              width: viewWidth,
+              height: viewHeight,
               margin: "0 auto",
               display: "flex",
               alignItems: "center",
@@ -210,10 +224,10 @@ export default function ImageCropper({
             <div
               ref={containerRef}
               style={{
-                width: viewSize,
-                height: viewSize,
+                width: viewWidth,
+                height: viewHeight,
                 margin: "0 auto",
-                borderRadius: "50%",
+                borderRadius: shape === "rect" ? 12 : "50%",
                 overflow: "hidden",
                 position: "relative",
                 border: "3px solid #fbbf24",

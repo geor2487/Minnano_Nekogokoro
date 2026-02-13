@@ -11,12 +11,13 @@ import postsRouter from "./routes/posts";
 import searchRouter from "./routes/search";
 import translateRouter from "./routes/translate";
 import uploadRouter from "./routes/upload";
+import consultRouter from "./routes/consult";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
 app.use(cors({ origin: ["http://localhost:5173", "http://localhost:5174"], credentials: true }));
-app.use(express.json({ limit: "10mb" }));
+app.use(express.json({ limit: "50mb" }));
 
 app.use("/api/auth", authRouter);
 app.use("/api/users", usersRouter);
@@ -25,6 +26,7 @@ app.use("/api/posts", postsRouter);
 app.use("/api/search", searchRouter);
 app.use("/api/translate", translateRouter);
 app.use("/api/upload", uploadRouter);
+app.use("/api/consult", consultRouter);
 
 app.get("/api/health", (_req, res) => {
   res.json({ status: "ok" });

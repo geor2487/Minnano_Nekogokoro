@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { CSSProperties } from "react";
 import type { Post } from "../types";
-import { PawPrint, HeartIcon, CommentIcon, ShareIcon, TranslateIcon, ChevDown, ChevUp } from "./Icons";
+import { PawPrint, HeartIcon, CommentIcon, ShareIcon, TranslateIcon, ChevDown, ChevUp, TrashIcon } from "./Icons";
 import Avatar from "./Avatar";
 import MoodBadge from "./MoodBadge";
 import SpeechBubble from "./SpeechBubble";
@@ -12,13 +12,17 @@ interface PostCardProps {
   onLike: (id: string) => void;
   onComment?: (id: string) => void;
   onFollowCat?: (catId: string) => void;
+  onDelete?: (id: string) => void;
   currentUserId?: string;
   style?: CSSProperties;
 }
 
-export default function PostCard({ post, onLike, onComment, onFollowCat, currentUserId, style }: PostCardProps) {
+export default function PostCard({ post, onLike, onComment, onFollowCat, onDelete, currentUserId, style }: PostCardProps) {
   const [open, setOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const hasTranslation = !!post.translation;
+  const isOwner = currentUserId && post.userId === currentUserId;
 
   return (
     <article
@@ -93,6 +97,17 @@ export default function PostCard({ post, onLike, onComment, onFollowCat, current
       {/* Image */}
       {post.imageUrl && (
         <img src={post.imageUrl} alt="" style={{ width: "100%", objectFit: "cover" }} />
+      )}
+
+      {/* Video */}
+      {post.videoUrl && (
+        <video
+          src={post.videoUrl}
+          controls
+          playsInline
+          preload="metadata"
+          style={{ width: "100%", display: "block" }}
+        />
       )}
 
       {/* Translation toggle */}
@@ -211,7 +226,97 @@ export default function PostCard({ post, onLike, onComment, onFollowCat, current
         >
           <ShareIcon size={15} />
         </button>
+        {isOwner && onDelete && (
+          <button
+            onClick={() => setConfirmDelete(true)}
+            style={{
+              marginLeft: "auto",
+              display: "flex",
+              alignItems: "center",
+              gap: 5,
+              padding: "6px 10px",
+              borderRadius: 8,
+              border: "none",
+              fontSize: 13,
+              cursor: "pointer",
+              fontFamily: "inherit",
+              color: "#a8a29e",
+              background: "transparent",
+            }}
+          >
+            <TrashIcon size={15} />
+          </button>
+        )}
       </div>
+
+      {/* Delete confirmation */}
+      {confirmDelete && (
+        <div
+          style={{
+            padding: "0 16px 12px",
+          }}
+        >
+          <div
+            style={{
+              background: "#fef2f2",
+              border: "1px solid #fecaca",
+              borderRadius: 12,
+              padding: "12px 14px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 10,
+            }}
+          >
+            <p style={{ fontSize: 13, color: "#b91c1c", fontWeight: 500 }}>
+              この投稿を削除しますか?
+            </p>
+            <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+              <button
+                onClick={() => setConfirmDelete(false)}
+                style={{
+                  padding: "6px 12px",
+                  borderRadius: 8,
+                  border: "1px solid #e7e5e4",
+                  background: "#fff",
+                  color: "#57534e",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                }}
+              >
+                キャンセル
+              </button>
+              <button
+                onClick={async () => {
+                  setDeleting(true);
+                  try {
+                    await onDelete?.(post.id);
+                  } catch {
+                    setDeleting(false);
+                    setConfirmDelete(false);
+                  }
+                }}
+                disabled={deleting}
+                style={{
+                  padding: "6px 12px",
+                  borderRadius: 8,
+                  border: "none",
+                  background: deleting ? "#d6d3d1" : "#dc2626",
+                  color: "#fff",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: deleting ? "wait" : "pointer",
+                  fontFamily: "inherit",
+                }}
+              >
+                {deleting ? "削除中..." : "削除"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </article>
   );
 }

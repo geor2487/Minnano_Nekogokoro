@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import api from "../lib/api";
 import { uploadImage } from "../utils/imageUpload";
 import type { User, Cat } from "../types";
-import { PawPrint } from "./Icons";
+import { PawPrint, CameraIcon, TrashIcon } from "./Icons";
+import ConsultMoodBadge from "./ConsultMoodBadge";
 import ImageCropper from "./ImageCropper";
 
 const BREEDS = [
@@ -15,14 +16,14 @@ interface ProfileTabProps {
   user: User;
   cats: Cat[];
   onLogout: () => void;
-  onUpdateProfile: (data: { name?: string; bio?: string; avatarUrl?: string }) => Promise<void>;
+  onUpdateProfile: (data: { name?: string; bio?: string; avatarUrl?: string; coverUrl?: string }) => Promise<void>;
   onUpdateCat: (id: string, data: Partial<{ name: string; breed: string; age: number; gender: string; personality: string; photoUrl: string }>) => Promise<any>;
   onDeleteCat: (id: string) => Promise<void>;
   onDeleteAccount: (password?: string) => Promise<void>;
   onRefreshCats: () => Promise<void>;
 }
 
-type ModalType = "editProfile" | "notifications" | "account" | null;
+type ModalType = "editProfile" | "notifications" | "account" | "likes" | null;
 
 const inputStyle = {
   width: "100%",
@@ -87,7 +88,7 @@ function EditProfileModal({
   onClose,
 }: {
   user: User;
-  onSave: (data: { name?: string; bio?: string; avatarUrl?: string }) => Promise<void>;
+  onSave: (data: { name?: string; bio?: string; avatarUrl?: string; coverUrl?: string }) => Promise<void>;
   onClose: () => void;
 }) {
   const [name, setName] = useState(user.name);
@@ -98,6 +99,10 @@ function EditProfileModal({
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [cropFile, setCropFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [coverPreview, setCoverPreview] = useState<string | null>(user.coverUrl || null);
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [coverCropFile, setCoverCropFile] = useState<File | null>(null);
+  const coverInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -113,6 +118,20 @@ function EditProfileModal({
     setCropFile(null);
   };
 
+  const handleCoverSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setCoverCropFile(file);
+    }
+    if (e.target) e.target.value = "";
+  };
+
+  const handleCoverCropped = (croppedFile: File) => {
+    setCoverFile(croppedFile);
+    setCoverPreview(URL.createObjectURL(croppedFile));
+    setCoverCropFile(null);
+  };
+
   const handleSave = async () => {
     if (!name.trim()) {
       setError("名前は必須です");
@@ -122,10 +141,14 @@ function EditProfileModal({
     setError("");
     try {
       let avatarUrl: string | undefined;
+      let coverUrl: string | undefined;
       if (avatarFile) {
         avatarUrl = await uploadImage(avatarFile);
       }
-      await onSave({ name: name.trim(), bio: bio.trim() || undefined, avatarUrl });
+      if (coverFile) {
+        coverUrl = await uploadImage(coverFile);
+      }
+      await onSave({ name: name.trim(), bio: bio.trim() || undefined, avatarUrl, coverUrl });
       onClose();
     } catch {
       setError("保存に失敗しました");
@@ -151,6 +174,34 @@ function EditProfileModal({
               {error}
             </div>
           )}
+
+          {/* Cover photo upload */}
+          <div style={{ marginBottom: 20 }}>
+            <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#57534e", marginBottom: 6 }}>ヘッダー写真</label>
+            <input type="file" accept="image/*" ref={coverInputRef} onChange={handleCoverSelect} style={{ display: "none" }} />
+            <div
+              onClick={() => coverInputRef.current?.click()}
+              style={{
+                width: "100%",
+                height: 120,
+                borderRadius: 12,
+                overflow: "hidden",
+                cursor: "pointer",
+                border: "1px dashed #d6d3d1",
+                position: "relative",
+                background: coverPreview ? "none" : "linear-gradient(135deg,#fef3c7 0%,#fde68a 50%,#fed7aa 100%)",
+              }}
+            >
+              {coverPreview ? (
+                <img src={coverPreview} alt="cover" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+              ) : (
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", flexDirection: "column", gap: 4 }}>
+                  <CameraIcon size={24} style={{ color: "#b45309" }} />
+                  <span style={{ fontSize: 12, color: "#b45309" }}>タップして設定</span>
+                </div>
+              )}
+            </div>
+          </div>
 
           {/* Avatar upload area */}
           <div style={{ textAlign: "center", marginBottom: 20 }}>
@@ -228,6 +279,16 @@ function EditProfileModal({
           file={cropFile}
           onCrop={handleCropped}
           onCancel={() => setCropFile(null)}
+        />
+      )}
+      {coverCropFile && (
+        <ImageCropper
+          file={coverCropFile}
+          onCrop={handleCoverCropped}
+          onCancel={() => setCoverCropFile(null)}
+          shape="rect"
+          aspectRatio={3}
+          cropSize={900}
         />
       )}
     </>
@@ -508,6 +569,256 @@ function AccountModal({
   );
 }
 
+// ──────── Cat Post Item ────────
+function CatPostItem({ post, onDelete }: { post: any; onDelete: (id: string) => Promise<void> }) {
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  return (
+    <div
+      style={{
+        background: "#fafaf9",
+        borderRadius: 12,
+        border: "1px solid #e7e5e4",
+        padding: 12,
+      }}
+    >
+      <p style={{ fontSize: 13, color: "#44403c", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
+        {post.content}
+      </p>
+      {post.imageUrl && (
+        <img src={post.imageUrl} alt="" style={{ width: "100%", borderRadius: 8, marginTop: 8, objectFit: "cover" }} />
+      )}
+      {post.videoUrl && (
+        <video src={post.videoUrl} controls playsInline preload="metadata" style={{ width: "100%", borderRadius: 8, marginTop: 8, display: "block" }} />
+      )}
+      {post.translation && (
+        <div style={{ marginTop: 8, padding: "8px 10px", background: "#fffbeb", borderRadius: 8, border: "1px solid #fde68a" }}>
+          <p style={{ fontSize: 12, color: "#92400e", lineHeight: 1.5 }}>{post.translation}</p>
+        </div>
+      )}
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 8, fontSize: 11, color: "#a8a29e" }}>
+        <span>{new Date(post.createdAt).toLocaleDateString("ja-JP")}</span>
+        <span>{post._count?.likes ?? 0} いいね</span>
+        <span>{post._count?.comments ?? 0} コメント</span>
+        <button
+          onClick={() => setConfirmDelete(true)}
+          style={{
+            marginLeft: "auto",
+            display: "flex",
+            alignItems: "center",
+            background: "none",
+            border: "none",
+            color: "#a8a29e",
+            cursor: "pointer",
+            padding: "2px 4px",
+          }}
+        >
+          <TrashIcon size={13} />
+        </button>
+      </div>
+      {confirmDelete && (
+        <div
+          style={{
+            marginTop: 8,
+            background: "#fef2f2",
+            border: "1px solid #fecaca",
+            borderRadius: 8,
+            padding: "10px 12px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 8,
+          }}
+        >
+          <p style={{ fontSize: 12, color: "#b91c1c", fontWeight: 500 }}>削除しますか?</p>
+          <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+            <button
+              onClick={() => setConfirmDelete(false)}
+              style={{
+                padding: "4px 10px",
+                borderRadius: 6,
+                border: "1px solid #e7e5e4",
+                background: "#fff",
+                color: "#57534e",
+                fontSize: 11,
+                fontWeight: 600,
+                cursor: "pointer",
+                fontFamily: "inherit",
+              }}
+            >
+              キャンセル
+            </button>
+            <button
+              onClick={async () => {
+                setDeleting(true);
+                try {
+                  await onDelete(post.id);
+                } catch {
+                  setDeleting(false);
+                  setConfirmDelete(false);
+                }
+              }}
+              disabled={deleting}
+              style={{
+                padding: "4px 10px",
+                borderRadius: 6,
+                border: "none",
+                background: deleting ? "#d6d3d1" : "#dc2626",
+                color: "#fff",
+                fontSize: 11,
+                fontWeight: 600,
+                cursor: deleting ? "wait" : "pointer",
+                fontFamily: "inherit",
+              }}
+            >
+              {deleting ? "削除中..." : "削除"}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ──────── Consultation Item ────────
+function ConsultationItem({ consultation, onDelete }: { consultation: any; onDelete: (id: string) => Promise<void> }) {
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div
+      style={{
+        background: "#fafaf9",
+        borderRadius: 12,
+        border: "1px solid #e7e5e4",
+        padding: 12,
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+        <ConsultMoodBadge mood={consultation.mood} size="sm" />
+        <span style={{ fontSize: 11, color: "#a8a29e" }}>
+          {consultation.inputType === "text" ? "テキスト" : consultation.inputType === "photo" ? "写真" : "動画"}
+        </span>
+      </div>
+      <p style={{ fontSize: 13, color: "#78350f", lineHeight: 1.6, fontWeight: 500 }}>
+        {consultation.feeling}
+      </p>
+      {expanded && (
+        <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
+          <div style={{ padding: "8px 10px", background: "#eff6ff", borderRadius: 8, border: "1px solid #bfdbfe" }}>
+            <p style={{ fontSize: 11, fontWeight: 700, color: "#1d4ed8", marginBottom: 4 }}>行動の解説</p>
+            <p style={{ fontSize: 12, color: "#44403c", lineHeight: 1.6 }}>{consultation.explanation}</p>
+          </div>
+          <div style={{ padding: "8px 10px", background: "#ecfdf5", borderRadius: 8, border: "1px solid #a7f3d0" }}>
+            <p style={{ fontSize: 11, fontWeight: 700, color: "#047857", marginBottom: 4 }}>アドバイス</p>
+            <p style={{ fontSize: 12, color: "#44403c", lineHeight: 1.6 }}>{consultation.advice}</p>
+          </div>
+          {consultation.inputText && (
+            <p style={{ fontSize: 12, color: "#78716c", lineHeight: 1.5 }}>
+              入力: {consultation.inputText}
+            </p>
+          )}
+        </div>
+      )}
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 8, fontSize: 11, color: "#a8a29e" }}>
+        <span>{new Date(consultation.createdAt).toLocaleDateString("ja-JP")}</span>
+        <button
+          onClick={() => setExpanded(!expanded)}
+          style={{
+            background: "none",
+            border: "none",
+            color: "#f59e0b",
+            fontSize: 11,
+            fontWeight: 600,
+            cursor: "pointer",
+            fontFamily: "inherit",
+            padding: 0,
+          }}
+        >
+          {expanded ? "閉じる" : "詳しく見る"}
+        </button>
+        <button
+          onClick={() => setConfirmDelete(true)}
+          style={{
+            marginLeft: "auto",
+            display: "flex",
+            alignItems: "center",
+            background: "none",
+            border: "none",
+            color: "#a8a29e",
+            cursor: "pointer",
+            padding: "2px 4px",
+          }}
+        >
+          <TrashIcon size={13} />
+        </button>
+      </div>
+      {confirmDelete && (
+        <div
+          style={{
+            marginTop: 8,
+            background: "#fef2f2",
+            border: "1px solid #fecaca",
+            borderRadius: 8,
+            padding: "10px 12px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 8,
+          }}
+        >
+          <p style={{ fontSize: 12, color: "#b91c1c", fontWeight: 500 }}>削除しますか?</p>
+          <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+            <button
+              onClick={() => setConfirmDelete(false)}
+              style={{
+                padding: "4px 10px",
+                borderRadius: 6,
+                border: "1px solid #e7e5e4",
+                background: "#fff",
+                color: "#57534e",
+                fontSize: 11,
+                fontWeight: 600,
+                cursor: "pointer",
+                fontFamily: "inherit",
+              }}
+            >
+              キャンセル
+            </button>
+            <button
+              onClick={async () => {
+                setDeleting(true);
+                try {
+                  await onDelete(consultation.id);
+                } catch {
+                  setDeleting(false);
+                  setConfirmDelete(false);
+                }
+              }}
+              disabled={deleting}
+              style={{
+                padding: "4px 10px",
+                borderRadius: 6,
+                border: "none",
+                background: deleting ? "#d6d3d1" : "#dc2626",
+                color: "#fff",
+                fontSize: 11,
+                fontWeight: 600,
+                cursor: deleting ? "wait" : "pointer",
+                fontFamily: "inherit",
+              }}
+            >
+              {deleting ? "削除中..." : "削除"}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ──────── Cat Detail Modal ────────
 function CatDetailModal({
   cat,
@@ -533,6 +844,15 @@ function CatDetailModal({
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoCropFile, setPhotoCropFile] = useState<File | null>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
+  const [consultations, setConsultations] = useState<any[]>([]);
+  const [consultLoading, setConsultLoading] = useState(true);
+
+  useEffect(() => {
+    api.get("/consult/history").then((res) => {
+      setConsultations(res.data.filter((c: any) => c.catId === cat.id));
+      setConsultLoading(false);
+    }).catch(() => setConsultLoading(false));
+  }, [cat.id]);
 
   const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -866,6 +1186,116 @@ function CatDetailModal({
             削除
           </button>
         </div>
+
+        {/* Saved consultations */}
+        <div style={{ marginTop: 24 }}>
+          <p style={{ fontSize: 13, fontWeight: 700, color: "#57534e", marginBottom: 10 }}>
+            {cat.name}の保存した相談
+          </p>
+          {consultLoading ? (
+            <div style={{ textAlign: "center", padding: "20px 0" }}>
+              <div style={{ width: 24, height: 24, border: "3px solid #fde68a", borderTopColor: "#f59e0b", borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto" }} />
+            </div>
+          ) : consultations.length === 0 ? (
+            <p style={{ fontSize: 13, color: "#a8a29e", textAlign: "center", padding: "16px 0" }}>
+              まだ保存した相談はありません
+            </p>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {consultations.map((c) => (
+                <ConsultationItem
+                  key={c.id}
+                  consultation={c}
+                  onDelete={async (id: string) => {
+                    await api.delete(`/consult/history/${id}`);
+                    setConsultations((prev) => prev.filter((item: any) => item.id !== id));
+                  }}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ──────── Liked Posts Modal ────────
+function LikedPostsModal({ onClose }: { onClose: () => void }) {
+  const [posts, setPosts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.get("/posts/liked/me").then((res) => {
+      setPosts(res.data);
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, []);
+
+  return (
+    <div style={overlayStyle} onClick={onClose}>
+      <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 14, color: "#78716c", cursor: "pointer", fontFamily: "inherit" }}>
+            閉じる
+          </button>
+          <p style={{ fontSize: 17, fontWeight: 700, color: "#292524" }}>いいねした投稿</p>
+          <div style={{ width: 40 }} />
+        </div>
+        {loading ? (
+          <div style={{ textAlign: "center", padding: "30px 0" }}>
+            <div style={{ width: 28, height: 28, border: "3px solid #fde68a", borderTopColor: "#f59e0b", borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto" }} />
+          </div>
+        ) : posts.length === 0 ? (
+          <p style={{ textAlign: "center", padding: "30px 0", color: "#a8a29e", fontSize: 14 }}>
+            まだいいねした投稿はありません
+          </p>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {posts.map((post) => (
+              <div
+                key={post.id}
+                style={{
+                  background: "#fafaf9",
+                  borderRadius: 12,
+                  border: "1px solid #e7e5e4",
+                  padding: 12,
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                  {post.user?.avatarUrl ? (
+                    <img src={post.user.avatarUrl} alt="" style={{ width: 28, height: 28, borderRadius: "50%", objectFit: "cover" }} />
+                  ) : (
+                    <div style={{ width: 28, height: 28, borderRadius: "50%", background: "#dbeafe", color: "#1d4ed8", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="12" cy="8" r="4" /><path d="M20 21a8 8 0 0 0-16 0" /></svg>
+                    </div>
+                  )}
+                  <span style={{ fontSize: 13, fontWeight: 600, color: "#292524" }}>{post.user?.name}</span>
+                  <span style={{ fontSize: 11, color: "#a8a29e" }}>{post.cat?.name}</span>
+                </div>
+                <p style={{ fontSize: 13, color: "#44403c", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
+                  {post.content}
+                </p>
+                {post.imageUrl && (
+                  <img src={post.imageUrl} alt="" style={{ width: "100%", borderRadius: 8, marginTop: 8, objectFit: "cover" }} />
+                )}
+                {post.videoUrl && (
+                  <video src={post.videoUrl} controls playsInline preload="metadata" style={{ width: "100%", borderRadius: 8, marginTop: 8, display: "block" }} />
+                )}
+                {post.translation && (
+                  <div style={{ marginTop: 8, padding: "8px 10px", background: "#fffbeb", borderRadius: 8, border: "1px solid #fde68a" }}>
+                    <p style={{ fontSize: 12, color: "#92400e", lineHeight: 1.5 }}>{post.translation}</p>
+                  </div>
+                )}
+                <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 8, fontSize: 11, color: "#a8a29e" }}>
+                  <span>{new Date(post.createdAt).toLocaleDateString("ja-JP")}</span>
+                  <span>{post._count?.likes ?? 0} いいね</span>
+                  <span>{post._count?.comments ?? 0} コメント</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -935,6 +1365,10 @@ export default function ProfileTab({
   const [selectedCat, setSelectedCat] = useState<Cat | null>(null);
   const [followerCat, setFollowerCat] = useState<Cat | null>(null);
   const [followingCats, setFollowingCats] = useState<any[]>([]);
+  const [showFollowingList, setShowFollowingList] = useState(false);
+  const [myPosts, setMyPosts] = useState<any[]>([]);
+  const [myPostsLoading, setMyPostsLoading] = useState(true);
+  const [showAllPosts, setShowAllPosts] = useState(false);
 
   useEffect(() => {
     api.get(`/users/${user.id}`).then((res) => setProfile(res.data));
@@ -944,6 +1378,13 @@ export default function ProfileTab({
     api.get(`/users/${user.id}/following`).then((res) => {
       setFollowingCats(res.data);
     });
+  }, [user.id]);
+
+  useEffect(() => {
+    api.get(`/posts/user/${user.id}`).then((res) => {
+      setMyPosts(res.data);
+      setMyPostsLoading(false);
+    }).catch(() => setMyPostsLoading(false));
   }, [user.id]);
 
   const u = profile || user;
@@ -959,6 +1400,9 @@ export default function ProfileTab({
       case "アカウント設定":
         setModal("account");
         break;
+      case "いいね":
+        setModal("likes");
+        break;
       case "ログアウト":
         onLogout();
         break;
@@ -970,12 +1414,18 @@ export default function ProfileTab({
       {/* Gradient header */}
       <div
         style={{
-          background: "linear-gradient(135deg,#fef3c7 0%,#fde68a 50%,#fed7aa 100%)",
+          background: u.coverUrl
+            ? `url(${u.coverUrl}) center/cover no-repeat`
+            : "linear-gradient(135deg,#fef3c7 0%,#fde68a 50%,#fed7aa 100%)",
           padding: "32px 16px 20px",
           textAlign: "center",
           position: "relative",
         }}
       >
+        {/* Overlay for readability when cover photo is set */}
+        {u.coverUrl && (
+          <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.25)", pointerEvents: "none" }} />
+        )}
         {u.avatarUrl ? (
           <img
             src={u.avatarUrl}
@@ -1013,11 +1463,11 @@ export default function ProfileTab({
             <svg width="40" height="40" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="12" cy="8" r="4" /><path d="M20 21a8 8 0 0 0-16 0" /></svg>
           </div>
         )}
-        <h2 style={{ fontSize: 20, fontWeight: 700, color: "#292524", position: "relative", margin: 0 }}>
+        <h2 style={{ fontSize: 20, fontWeight: 700, color: u.coverUrl ? "#fff" : "#292524", position: "relative", margin: 0, textShadow: u.coverUrl ? "0 1px 4px rgba(0,0,0,0.4)" : "none" }}>
           {u.name}
         </h2>
         {u.bio && (
-          <p style={{ fontSize: 13, color: "#78716c", marginTop: 4, position: "relative" }}>{u.bio}</p>
+          <p style={{ fontSize: 13, color: u.coverUrl ? "rgba(255,255,255,0.85)" : "#78716c", marginTop: 4, position: "relative", textShadow: u.coverUrl ? "0 1px 3px rgba(0,0,0,0.3)" : "none" }}>{u.bio}</p>
         )}
         <div
           style={{
@@ -1028,15 +1478,17 @@ export default function ProfileTab({
             position: "relative",
           }}
         >
-          {[
-            { v: u._count?.posts ?? 0, l: "投稿" },
-            { v: u._count?.following ?? 0, l: "フォロー中" },
-          ].map((s) => (
-            <div key={s.l}>
-              <p style={{ fontSize: 18, fontWeight: 700, color: "#292524" }}>{s.v}</p>
-              <p style={{ fontSize: 11, color: "#78716c" }}>{s.l}</p>
-            </div>
-          ))}
+          <div>
+            <p style={{ fontSize: 18, fontWeight: 700, color: u.coverUrl ? "#fff" : "#292524", textShadow: u.coverUrl ? "0 1px 4px rgba(0,0,0,0.4)" : "none" }}>{u._count?.posts ?? 0}</p>
+            <p style={{ fontSize: 11, color: u.coverUrl ? "rgba(255,255,255,0.8)" : "#78716c", textShadow: u.coverUrl ? "0 1px 3px rgba(0,0,0,0.3)" : "none" }}>投稿</p>
+          </div>
+          <div
+            onClick={() => setShowFollowingList(true)}
+            style={{ cursor: "pointer" }}
+          >
+            <p style={{ fontSize: 18, fontWeight: 700, color: u.coverUrl ? "#fff" : "#292524", textShadow: u.coverUrl ? "0 1px 4px rgba(0,0,0,0.4)" : "none" }}>{u._count?.following ?? 0}</p>
+            <p style={{ fontSize: 11, color: u.coverUrl ? "rgba(255,255,255,0.8)" : "#78716c", textShadow: u.coverUrl ? "0 1px 3px rgba(0,0,0,0.3)" : "none" }}>フォロー中</p>
+          </div>
         </div>
       </div>
 
@@ -1151,6 +1603,64 @@ export default function ProfileTab({
         </div>
       </div>
 
+      {/* My posts */}
+      <div style={{ padding: "0 16px 20px" }}>
+        <h3
+          style={{
+            fontSize: 15,
+            fontWeight: 700,
+            color: "#292524",
+            marginBottom: 12,
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+          }}
+        >
+          これまでの投稿
+        </h3>
+        {myPostsLoading ? (
+          <div style={{ textAlign: "center", padding: "20px 0" }}>
+            <div style={{ width: 24, height: 24, border: "3px solid #fde68a", borderTopColor: "#f59e0b", borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto" }} />
+          </div>
+        ) : myPosts.length === 0 ? (
+          <p style={{ fontSize: 13, color: "#a8a29e", textAlign: "center", padding: "16px 0" }}>
+            まだ投稿はありません
+          </p>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {(showAllPosts ? myPosts : myPosts.slice(0, 10)).map((post) => (
+              <CatPostItem
+                key={post.id}
+                post={post}
+                onDelete={async (postId: string) => {
+                  await api.delete(`/posts/${postId}`);
+                  setMyPosts((prev) => prev.filter((p: any) => p.id !== postId));
+                }}
+              />
+            ))}
+            {!showAllPosts && myPosts.length > 10 && (
+              <button
+                onClick={() => setShowAllPosts(true)}
+                style={{
+                  width: "100%",
+                  padding: "12px 0",
+                  borderRadius: 12,
+                  border: "1px solid #e7e5e4",
+                  background: "#fff",
+                  color: "#f59e0b",
+                  fontSize: 14,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                }}
+              >
+                もっと見る（残り{myPosts.length - 10}件）
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
       {/* フォロー中の猫 */}
       <div style={{ padding: "0 16px 16px" }}>
         <p style={{ fontSize: 13, fontWeight: 700, color: "#57534e", marginBottom: 10 }}>
@@ -1190,7 +1700,7 @@ export default function ProfileTab({
             overflow: "hidden",
           }}
         >
-          {["プロフィール編集", "通知設定", "アカウント設定", "ログアウト"].map((item, i, arr) => (
+          {["プロフィール編集", "いいね", "通知設定", "アカウント設定", "ログアウト"].map((item, i, arr) => (
             <div
               key={item}
               onClick={() => handleSettingClick(item)}
@@ -1231,6 +1741,9 @@ export default function ProfileTab({
           onClose={() => setModal(null)}
         />
       )}
+      {modal === "likes" && (
+        <LikedPostsModal onClose={() => setModal(null)} />
+      )}
       {selectedCat && (
         <CatDetailModal
           cat={selectedCat}
@@ -1249,6 +1762,42 @@ export default function ProfileTab({
       )}
       {followerCat && (
         <CatFollowerListModal cat={followerCat} onClose={() => setFollowerCat(null)} />
+      )}
+      {showFollowingList && (
+        <div style={overlayStyle} onClick={() => setShowFollowingList(false)}>
+          <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
+            <p style={modalTitleStyle}>フォロー中の猫</p>
+            {followingCats.length === 0 ? (
+              <p style={{ textAlign: "center", padding: "30px 0", color: "#a8a29e", fontSize: 14 }}>
+                まだフォロー中の猫はいません
+              </p>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {followingCats.map((cat) => (
+                  <div key={cat.id} style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    {cat.photoUrl ? (
+                      <img src={cat.photoUrl} alt={cat.name} style={{ width: 48, height: 48, borderRadius: "50%", objectFit: "cover", border: "2px solid #fde68a" }} />
+                    ) : (
+                      <div style={{ width: 48, height: 48, borderRadius: "50%", background: "linear-gradient(135deg,#fef3c7,#fde68a)", border: "2px solid #fbbf24", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, fontWeight: 700, color: "#b45309", flexShrink: 0 }}>
+                        {cat.name.charAt(0)}
+                      </div>
+                    )}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ fontSize: 14, fontWeight: 700, color: "#292524" }}>{cat.name}</p>
+                      <p style={{ fontSize: 12, color: "#a8a29e" }}>{cat.breed}{cat.user?.name ? ` - ${cat.user.name}` : ""}</p>
+                    </div>
+                    {cat._count?.followers !== undefined && (
+                      <span style={{ fontSize: 11, color: "#a8a29e" }}>{cat._count.followers}人</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+            <button onClick={() => setShowFollowingList(false)} style={{ width: "100%", padding: "12px 0", borderRadius: 14, border: "1px solid #e7e5e4", background: "#fff", color: "#78716c", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", marginTop: 20 }}>
+              閉じる
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

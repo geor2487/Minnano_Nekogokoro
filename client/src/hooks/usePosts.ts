@@ -57,6 +57,7 @@ export function usePosts() {
       content: string;
       catId: string;
       imageUrl?: string;
+      videoUrl?: string;
       translation?: string;
       mood?: string;
       moodFace?: string;
@@ -84,5 +85,10 @@ export function usePosts() {
     }
   }, []);
 
-  return { posts, loading, fetchPosts, searchPosts, toggleLike, createPost, toggleFollowCat };
+  const deletePost = useCallback(async (postId: string) => {
+    await api.delete(`/posts/${postId}`);
+    setPosts((prev) => prev.filter((p) => p.id !== postId));
+  }, []);
+
+  return { posts, loading, fetchPosts, searchPosts, toggleLike, createPost, toggleFollowCat, deletePost };
 }

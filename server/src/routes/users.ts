@@ -10,11 +10,11 @@ router.put(
   authMiddleware,
   async (req: AuthRequest, res: Response) => {
     try {
-      const { name, bio, avatarUrl } = req.body;
+      const { name, bio, avatarUrl, coverUrl } = req.body;
       const user = await prisma.user.update({
         where: { id: req.userId },
-        data: { name, bio, avatarUrl },
-        select: { id: true, name: true, bio: true, avatarUrl: true },
+        data: { name, bio, avatarUrl, coverUrl },
+        select: { id: true, name: true, bio: true, avatarUrl: true, coverUrl: true },
       });
       res.json(user);
     } catch (error) {
@@ -34,6 +34,7 @@ router.get("/:id", async (req: AuthRequest, res: Response) => {
         name: true,
         bio: true,
         avatarUrl: true,
+        coverUrl: true,
         createdAt: true,
         _count: { select: { posts: true, following: true } },
         cats: {

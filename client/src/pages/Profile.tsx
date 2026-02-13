@@ -28,7 +28,7 @@ export default function Profile({ user, onLogout }: ProfileProps) {
 
   const initial = user.name.charAt(0).toUpperCase();
   const postCount = user._count?.posts ?? 0;
-  const followerCount = user._count?.followers ?? 0;
+  const followerCount = (user._count as Record<string, number> | undefined)?.followers ?? 0;
   const followingCount = user._count?.following ?? 0;
 
   return (

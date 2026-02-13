@@ -55,3 +55,9 @@ export async function uploadImage(file: File): Promise<string> {
   const res = await api.post("/upload/image", { image: base64 });
   return res.data.url;
 }
+
+export async function uploadVideo(file: File): Promise<string> {
+  const base64 = await fileToBase64(file);
+  const res = await api.post("/upload/video", { video: base64 });
+  return res.data.url;
+}

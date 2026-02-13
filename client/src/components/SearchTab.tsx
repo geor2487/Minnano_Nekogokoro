@@ -12,7 +12,7 @@ interface SearchTabProps {
 }
 
 export default function SearchTab({ onComment, requireAuth, currentUserId }: SearchTabProps) {
-  const { posts, loading, searchPosts, toggleLike, toggleFollowCat } = usePosts();
+  const { posts, loading, searchPosts, toggleLike, toggleFollowCat, deletePost } = usePosts();
 
   const handleLike = (postId: string) => {
     if (requireAuth) {
@@ -153,7 +153,7 @@ export default function SearchTab({ onComment, requireAuth, currentUserId }: Sea
             </p>
           ) : (
             posts.map((p) => (
-              <PostCard key={p.id} post={p} onLike={handleLike} onComment={onComment} onFollowCat={handleFollowCat} currentUserId={currentUserId} />
+              <PostCard key={p.id} post={p} onLike={handleLike} onComment={onComment} onFollowCat={handleFollowCat} onDelete={deletePost} currentUserId={currentUserId} />
             ))
           )}
         </div>

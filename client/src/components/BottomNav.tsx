@@ -1,16 +1,16 @@
 import type { CSSProperties } from "react";
-import { HomeIcon, SearchIcon, UserIcon, PlusIcon } from "./Icons";
+import { HomeIcon, SearchIcon, ConsultIcon, UserIcon } from "./Icons";
 
 interface BottomNavProps {
   currentTab: string;
   onChangeTab: (tab: string) => void;
-  onCompose: () => void;
 }
 
-export default function BottomNav({ currentTab, onChangeTab, onCompose }: BottomNavProps) {
+export default function BottomNav({ currentTab, onChangeTab }: BottomNavProps) {
   const items = [
     { id: "home", Icon: HomeIcon },
     { id: "search", Icon: SearchIcon },
+    { id: "consult", Icon: ConsultIcon },
     { id: "profile", Icon: UserIcon },
   ] as const;
 
@@ -56,24 +56,6 @@ export default function BottomNav({ currentTab, onChangeTab, onCompose }: Bottom
           <item.Icon size={currentTab === item.id ? 25 : 23} />
         </button>
       ))}
-      <button
-        onClick={onCompose}
-        style={{
-          width: 42,
-          height: 42,
-          borderRadius: 13,
-          background: "linear-gradient(135deg,#f59e0b,#d97706)",
-          border: "none",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          cursor: "pointer",
-          color: "#fff",
-          boxShadow: "0 2px 8px rgba(245,158,11,0.3)",
-        }}
-      >
-        <PlusIcon size={21} />
-      </button>
     </nav>
   );
 }

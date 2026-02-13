@@ -136,7 +136,7 @@ router.get("/:id", optionalAuth, async (req: AuthRequest, res: Response) => {
 
 router.post("/", authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
-    const { content, imageUrl, catId, translation, mood, moodFace } = req.body;
+    const { content, imageUrl, videoUrl, catId, translation, mood, moodFace } = req.body;
 
     if (!content || !catId) {
       res.status(400).json({ error: "本文と猫の選択は必須です" });
@@ -153,6 +153,7 @@ router.post("/", authMiddleware, async (req: AuthRequest, res: Response) => {
       data: {
         content,
         imageUrl: imageUrl || null,
+        videoUrl: videoUrl || null,
         catId,
         userId: req.userId!,
         translation: translation || null,
@@ -187,6 +188,29 @@ router.delete("/:id", authMiddleware, async (req: AuthRequest, res: Response) =>
   } catch (error) {
     console.error("Delete post error:", error);
     res.status(500).json({ error: "投稿の削除に失敗しました" });
+  }
+});
+
+router.get("/liked/me", authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const likes = await prisma.like.findMany({
+      where: { userId: req.userId! },
+      orderBy: { createdAt: "desc" },
+      include: {
+        post: {
+          include: {
+            user: { select: { id: true, name: true, avatarUrl: true } },
+            cat: { select: { id: true, name: true, breed: true, photoUrl: true } },
+            _count: { select: { comments: true, likes: true } },
+          },
+        },
+      },
+    });
+    const posts = likes.map((l: any) => ({ ...l.post, liked: true }));
+    res.json(posts);
+  } catch (error) {
+    console.error("Get liked posts error:", error);
+    res.status(500).json({ error: "いいねした投稿の取得に失敗しました" });
   }
 });
 

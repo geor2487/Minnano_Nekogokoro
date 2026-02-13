@@ -106,6 +106,25 @@ router.get("/:id/followers", optionalAuth, async (req: AuthRequest, res: Respons
   }
 });
 
+router.get("/:id/posts", optionalAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    const catId = req.params.id as string;
+    const posts = await prisma.post.findMany({
+      where: { catId },
+      orderBy: { createdAt: "desc" },
+      include: {
+        user: { select: { id: true, name: true, avatarUrl: true } },
+        cat: { select: { id: true, name: true, breed: true, photoUrl: true } },
+        _count: { select: { comments: true, likes: true } },
+      },
+    });
+    res.json(posts);
+  } catch (error) {
+    console.error("Get cat posts error:", error);
+    res.status(500).json({ error: "投稿の取得に失敗しました" });
+  }
+});
+
 router.put("/:id", authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const id = req.params.id as string;
