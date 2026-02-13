@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import type { Cat, TranslateResult } from "../types";
 import api from "../lib/api";
-import { uploadImage, uploadVideo, fileToBase64 } from "../utils/imageUpload";
+import { uploadImage, uploadVideo } from "../utils/imageUpload";
 import { CameraIcon, TranslateIcon, VideoIcon, XIcon } from "./Icons";
 import MoodBadge from "./MoodBadge";
 import SpeechBubble from "./SpeechBubble";

@@ -49,7 +49,6 @@ export default function Consult({ cats, onPost, onGoHome }: ConsultProps) {
   const [error, setError] = useState("");
   const [loadingMsg, setLoadingMsg] = useState("");
   const [saved, setSaved] = useState(false);
-  const [posted, setPosted] = useState(false);
   const [postingResult, setPostingResult] = useState(false);
 
   const photoRef = useRef<HTMLInputElement>(null);

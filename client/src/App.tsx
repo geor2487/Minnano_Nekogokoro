@@ -115,9 +115,6 @@ function AppContent() {
     [requireAuth]
   );
 
-  const handleCompose = useCallback(() => {
-    requireAuth(() => setShowCompose(true));
-  }, [requireAuth]);
 
   const handleOnboardingComplete = useCallback(() => {
     localStorage.setItem("onboarded", "1");
