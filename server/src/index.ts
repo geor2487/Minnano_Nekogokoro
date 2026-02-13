@@ -16,7 +16,13 @@ import consultRouter from "./routes/consult";
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-app.use(cors({ origin: ["http://localhost:5173", "http://localhost:5174"], credentials: true }));
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://localhost:5174",
+  process.env.CLIENT_URL,
+].filter(Boolean) as string[];
+
+app.use(cors({ origin: allowedOrigins, credentials: true }));
 app.use(express.json({ limit: "50mb" }));
 
 app.use("/api/auth", authRouter);
