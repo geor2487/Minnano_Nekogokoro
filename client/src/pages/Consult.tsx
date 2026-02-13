@@ -173,7 +173,6 @@ export default function Consult({ cats, onPost, onGoHome }: ConsultProps) {
     setResult(null);
     setError("");
     setSaved(false);
-    setPosted(false);
   }, []);
 
   const handlePostResult = useCallback(async () => {
