@@ -191,12 +191,11 @@ function EditProfileModal({
                     alignItems: "center",
                     justifyContent: "center",
                     margin: "0 auto",
-                    fontSize: 28,
-                    fontWeight: 700,
                     color: "#b45309",
+                    overflow: "hidden",
                   }}
                 >
-                  {name.charAt(0)}
+                  <svg width="40" height="40" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="12" cy="8" r="4" /><path d="M20 21a8 8 0 0 0-16 0" /></svg>
                 </div>
               )}
               <p style={{ fontSize: 11, color: "#a8a29e", marginTop: 4 }}>タップして変更</p>
@@ -903,8 +902,8 @@ function CatFollowerListModal({ cat, onClose }: { cat: Cat; onClose: () => void 
                 {f.avatarUrl ? (
                   <img src={f.avatarUrl} alt={f.name} style={{ width: 40, height: 40, borderRadius: "50%", objectFit: "cover", border: "2px solid #e7e5e4" }} />
                 ) : (
-                  <div style={{ width: 40, height: 40, borderRadius: "50%", background: "#dbeafe", color: "#1d4ed8", border: "2px solid #bfdbfe", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 14 }}>
-                    {f.name.charAt(0)}
+                  <div style={{ width: 40, height: 40, borderRadius: "50%", background: "#dbeafe", color: "#1d4ed8", border: "2px solid #bfdbfe", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="12" cy="8" r="4" /><path d="M20 21a8 8 0 0 0-16 0" /></svg>
                   </div>
                 )}
                 <span style={{ fontSize: 14, fontWeight: 600, color: "#292524" }}>{f.name}</span>
@@ -1000,19 +999,18 @@ export default function ProfileTab({
               width: 80,
               height: 80,
               borderRadius: "50%",
-              background: "#fff",
+              background: "#fef3c7",
               border: "3px solid #fbbf24",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               margin: "0 auto 12px",
-              fontSize: 28,
-              fontWeight: 700,
               color: "#b45309",
               cursor: "pointer",
+              overflow: "hidden",
             }}
           >
-            {u.name.charAt(0)}
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="12" cy="8" r="4" /><path d="M20 21a8 8 0 0 0-16 0" /></svg>
           </div>
         )}
         <h2 style={{ fontSize: 20, fontWeight: 700, color: "#292524", position: "relative", margin: 0 }}>

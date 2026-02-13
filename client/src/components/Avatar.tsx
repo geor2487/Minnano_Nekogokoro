@@ -8,10 +8,10 @@ const COLOR_MAP = {
 } as const;
 
 const SIZE_MAP = {
-  sm: { s: 32, f: 12 },
-  md: { s: 40, f: 14 },
-  lg: { s: 48, f: 16 },
-  xl: { s: 72, f: 28 },
+  sm: { s: 32, i: 16 },
+  md: { s: 40, i: 20 },
+  lg: { s: 48, i: 24 },
+  xl: { s: 72, i: 36 },
 } as const;
 
 interface AvatarProps {
@@ -20,6 +20,15 @@ interface AvatarProps {
   color?: keyof typeof COLOR_MAP;
   photoUrl?: string | null;
   style?: CSSProperties;
+}
+
+function PersonIcon({ size }: { size: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" stroke="none">
+      <circle cx="12" cy="8" r="4" />
+      <path d="M20 21a8 8 0 0 0-16 0" />
+    </svg>
+  );
 }
 
 export default function Avatar({
@@ -63,12 +72,12 @@ export default function Avatar({
         alignItems: "center",
         justifyContent: "center",
         fontWeight: 700,
-        fontSize: sz.f,
         flexShrink: 0,
+        overflow: "hidden",
         ...style,
       }}
     >
-      {initial}
+      <PersonIcon size={sz.i} />
     </div>
   );
 }

@@ -19,25 +19,37 @@ export default function ImageCropper({
 
   const [imgLoaded, setImgLoaded] = useState(false);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
-  const [scale, setScale] = useState(1);
+  const [zoom, setZoom] = useState(0);
   const [dragging, setDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-  const [imgSize, setImgSize] = useState({ w: 0, h: 0 });
+  const [naturalSize, setNaturalSize] = useState({ w: 0, h: 0 });
 
   const viewSize = 280;
+
+  // Compute actual pixel scale from zoom level (0-100)
+  // zoom=0 means image just fits the circle, zoom=100 means 3x that
+  const getScale = useCallback(
+    (z: number) => {
+      if (naturalSize.w === 0 || naturalSize.h === 0) return 1;
+      const fitScale = viewSize / Math.min(naturalSize.w, naturalSize.h);
+      return fitScale * (1 + (z / 100) * 2);
+    },
+    [naturalSize]
+  );
+
+  const scale = getScale(zoom);
 
   useEffect(() => {
     const img = new Image();
     img.onload = () => {
       imgRef.current = img;
-      const minDim = Math.min(img.width, img.height);
-      const initScale = viewSize / minDim;
-      setImgSize({ w: img.width, h: img.height });
-      setScale(initScale);
+      setNaturalSize({ w: img.naturalWidth, h: img.naturalHeight });
+      const fitScale = viewSize / Math.min(img.naturalWidth, img.naturalHeight);
       setOffset({
-        x: (viewSize - img.width * initScale) / 2,
-        y: (viewSize - img.height * initScale) / 2,
+        x: (viewSize - img.naturalWidth * fitScale) / 2,
+        y: (viewSize - img.naturalHeight * fitScale) / 2,
       });
+      setZoom(0);
       setImgLoaded(true);
     };
     img.src = URL.createObjectURL(file);
@@ -81,23 +93,22 @@ export default function ImageCropper({
     setDragging(false);
   }, []);
 
-  const handleZoom = useCallback(
-    (delta: number) => {
-      setScale((prev) => {
-        const minDim = Math.min(imgSize.w, imgSize.h);
-        const minScale = viewSize / minDim;
-        const newScale = Math.max(minScale * 0.5, Math.min(prev + delta, minScale * 4));
-        const ratio = newScale / prev;
-        const centerX = viewSize / 2;
-        const centerY = viewSize / 2;
-        setOffset((o) => ({
-          x: centerX - (centerX - o.x) * ratio,
-          y: centerY - (centerY - o.y) * ratio,
-        }));
-        return newScale;
-      });
+  const handleZoomChange = useCallback(
+    (newZoom: number) => {
+      const clamped = Math.max(0, Math.min(100, newZoom));
+      const oldScale = getScale(zoom);
+      const newScale = getScale(clamped);
+      if (oldScale === 0) return;
+      const ratio = newScale / oldScale;
+      const cx = viewSize / 2;
+      const cy = viewSize / 2;
+      setOffset((o) => ({
+        x: cx - (cx - o.x) * ratio,
+        y: cy - (cy - o.y) * ratio,
+      }));
+      setZoom(clamped);
     },
-    [imgSize]
+    [zoom, getScale]
   );
 
   const handleCrop = useCallback(() => {
@@ -109,7 +120,6 @@ export default function ImageCropper({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const ratio = cropSize / viewSize;
     const sx = -offset.x / scale;
     const sy = -offset.y / scale;
     const sw = viewSize / scale;
@@ -120,31 +130,21 @@ export default function ImageCropper({
     ctx.closePath();
     ctx.clip();
 
-    ctx.drawImage(
-      imgRef.current,
-      sx,
-      sy,
-      sw,
-      sh,
-      0,
-      0,
-      cropSize,
-      cropSize
-    );
+    ctx.drawImage(imgRef.current, sx, sy, sw, sh, 0, 0, cropSize, cropSize);
 
     canvas.toBlob(
       (blob) => {
         if (blob) {
-          const croppedFile = new File([blob], "avatar.jpg", {
-            type: "image/jpeg",
-          });
-          onCrop(croppedFile);
+          onCrop(new File([blob], "avatar.jpg", { type: "image/jpeg" }));
         }
       },
       "image/jpeg",
       0.85
     );
   }, [offset, scale, cropSize, onCrop]);
+
+  const displayW = naturalSize.w * scale;
+  const displayH = naturalSize.h * scale;
 
   return (
     <div
@@ -217,6 +217,7 @@ export default function ImageCropper({
                 overflow: "hidden",
                 position: "relative",
                 border: "3px solid #fbbf24",
+                background: "#f5f5f4",
                 cursor: dragging ? "grabbing" : "grab",
                 touchAction: "none",
                 userSelect: "none",
@@ -238,8 +239,9 @@ export default function ImageCropper({
                     position: "absolute",
                     left: offset.x,
                     top: offset.y,
-                    width: imgSize.w * scale,
-                    height: imgSize.h * scale,
+                    width: displayW,
+                    height: displayH,
+                    maxWidth: "none",
                     pointerEvents: "none",
                   }}
                 />
@@ -252,12 +254,12 @@ export default function ImageCropper({
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                gap: 16,
+                gap: 12,
                 marginTop: 16,
               }}
             >
               <button
-                onClick={() => handleZoom(-0.02)}
+                onClick={() => handleZoomChange(zoom - 5)}
                 style={{
                   width: 36,
                   height: 36,
@@ -279,34 +281,12 @@ export default function ImageCropper({
                 type="range"
                 min={0}
                 max={100}
-                value={(() => {
-                  const minDim = Math.min(imgSize.w, imgSize.h);
-                  const minScale = viewSize / minDim;
-                  const maxScale = minScale * 4;
-                  return ((scale - minScale * 0.5) / (maxScale - minScale * 0.5)) * 100;
-                })()}
-                onChange={(e) => {
-                  const minDim = Math.min(imgSize.w, imgSize.h);
-                  const minScale = viewSize / minDim;
-                  const maxScale = minScale * 4;
-                  const pct = Number(e.target.value) / 100;
-                  const newScale = minScale * 0.5 + pct * (maxScale - minScale * 0.5);
-                  const ratio = newScale / scale;
-                  const centerX = viewSize / 2;
-                  const centerY = viewSize / 2;
-                  setOffset((o) => ({
-                    x: centerX - (centerX - o.x) * ratio,
-                    y: centerY - (centerY - o.y) * ratio,
-                  }));
-                  setScale(newScale);
-                }}
-                style={{
-                  width: 140,
-                  accentColor: "#f59e0b",
-                }}
+                value={zoom}
+                onChange={(e) => handleZoomChange(Number(e.target.value))}
+                style={{ width: 160, accentColor: "#f59e0b" }}
               />
               <button
-                onClick={() => handleZoom(0.02)}
+                onClick={() => handleZoomChange(zoom + 5)}
                 style={{
                   width: 36,
                   height: 36,
